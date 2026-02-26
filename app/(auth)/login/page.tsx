@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText } from 'lucide-react'
+import { signInWithEmailAndPassword } from 'firebase/auth'
+import { auth } from '@/lib/firebase'
+import { FirebaseError } from 'firebase/app'
 
 export default function Page() {
   const [email, setEmail] = useState('')
@@ -11,35 +13,49 @@ export default function Page() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
     setError(null)
 
-    // Fake login check (frontend only)
-    setTimeout(() => {
-      if (email === 'demo@example.com' && password === 'password123') {
-        router.push('/dashboard')
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+
+      // Redirect after successful login
+      router.push('/dashboard')
+
+    } catch (err) {
+      if (err instanceof FirebaseError) {
+        switch (err.code) {
+          case 'auth/user-not-found':
+            setError('User not found')
+            break
+          case 'auth/wrong-password':
+            setError('Incorrect password')
+            break
+          case 'auth/invalid-email':
+            setError('Invalid email format')
+            break
+          default:
+            setError('Login failed. Please try again.')
+        }
       } else {
-        setError('Invalid email or password')
+        setError('Unexpected error occurred')
       }
+    } finally {
       setIsLoading(false)
-    }, 800)
+    }
   }
 
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 px-6">
       <div className="w-full max-w-sm">
 
-        {/* Logo / Header */}
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            {/* <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
-              <FileText className="w-7 h-7 text-white" />
-            </div> */}
-          </div>
-          <h1 className="text-2xl font-bold text-white">SoundKraft Invoice</h1>
-          {/* <p className="text-sm text-slate-400 mt-1">Staff Portal</p> */}
+          <h1 className="text-2xl font-bold text-white">
+            SoundKraft Invoice
+          </h1>
         </div>
 
         {/* Login Card */}
@@ -50,9 +66,12 @@ export default function Page() {
           </p>
 
           <form onSubmit={handleLogin} className="space-y-5">
+
             {/* Email */}
             <div>
-              <label className="block text-sm text-slate-200 mb-1">Email</label>
+              <label className="block text-sm text-slate-200 mb-1">
+                Email
+              </label>
               <input
                 type="email"
                 required
@@ -65,7 +84,9 @@ export default function Page() {
 
             {/* Password */}
             <div>
-              <label className="block text-sm text-slate-200 mb-1">Password</label>
+              <label className="block text-sm text-slate-200 mb-1">
+                Password
+              </label>
               <input
                 type="password"
                 required
@@ -92,12 +113,6 @@ export default function Page() {
             </button>
           </form>
         </div>
-
-        {/* Demo Credentials */}
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Demo: <span className="text-slate-300">demo@example.com</span> /{' '}
-          <span className="text-slate-300">password123</span>
-        </p>
       </div>
     </div>
   )

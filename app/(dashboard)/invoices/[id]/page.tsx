@@ -6,6 +6,10 @@ import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import InvoicePreview from "../../components/InvoicePreview"
 import { Printer } from "lucide-react"
+import AddPaymentModal from "../../components/AddPaymentModal"
+import PaymentsTable from "../../components/PaymentsTable";
+import { PaymentProgress } from "../../components/PaymentProgress";
+import { Payment } from "@/types/payment"
 
 /* ================= TYPES ================= */
 
@@ -44,6 +48,8 @@ export default function InvoicePage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [payments, setPayments] = useState<Payment[]>([]);
+const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   /* ================= FETCH INVOICE ================= */
   useEffect(() => {

@@ -1,36 +1,39 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import "../globals.css";
-import Navbar from "./components/Navbar";
+'use client'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import "../globals.css"
+import Navbar from "./components/Navbar"
+import { useAuth } from "../context/AuthContext"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-export const metadata: Metadata = {
-  title: "SoundKraft Invoice",
-  description: "SoundKraft invoice generation app",
-};
-
-export default function RootLayout({
+export default function DashboardLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: {
+  children: React.ReactNode
+}) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login")
+    }
+  }, [user, loading, router])
+
+  if (loading) {
+    return (
+      <div className="p-10 text-center">
+        Checking authentication...
+      </div>
+    )
+  }
+
+  if (!user) return null
+
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
-      >
-        <Navbar />
-        <main className="p-6">{children}</main>
-      </body>
-    </html>
-  );
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="p-6">{children}</main>
+    </div>
+  )
 }

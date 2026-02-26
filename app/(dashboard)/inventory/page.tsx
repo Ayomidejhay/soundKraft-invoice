@@ -53,7 +53,7 @@ export default function Items() {
     if (!file) return;
 
     setImageFile(file);
-    setPreview(URL.createObjectURL(file)); // local preview
+    setPreview(URL.createObjectURL(file));
   };
 
   // ================= CREATE / UPDATE =================
@@ -62,15 +62,11 @@ export default function Items() {
 
     let imageUrl = formData.image;
 
-    // Upload new image if selected
     if (imageFile) {
       imageUrl = await uploadItemImage(imageFile);
     }
 
-    const payload = {
-      ...formData,
-      image: imageUrl,
-    };
+    const payload = { ...formData, image: imageUrl };
 
     if (editingId) {
       await updateItem(editingId, payload);
@@ -122,31 +118,32 @@ export default function Items() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-3">
         <h2 className="text-2xl font-bold">Inventory</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Item
-        </button>
+        <div className="flex gap-2 flex-col sm:flex-row">
+          <input
+            placeholder="Search items..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3 py-2 border rounded-lg w-full sm:w-auto"
+          />
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Item
+          </button>
+        </div>
       </div>
 
-      {/* Search */}
-      <input
-        placeholder="Search items..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="mb-4 w-full max-w-md px-3 py-2 border rounded-lg"
-      />
-
-      {/* Modal */}
+      {/* Modal Form */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg overflow-auto max-h-[90vh]">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold">
                 {editingId ? "Edit Item" : "Add Item"}
@@ -157,13 +154,12 @@ export default function Items() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+
               {/* Image */}
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  Item Image
-                </label>
-                <div className="flex items-center gap-4">
-                  <label className="flex gap-2 px-3 py-2 border rounded cursor-pointer">
+                <label className="block text-sm font-medium mb-1">Item Image</label>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <label className="flex gap-2 px-3 py-2 border rounded cursor-pointer hover:bg-gray-100 transition">
                     <ImageIcon />
                     Upload
                     <input type="file" hidden accept="image/*" onChange={handleImageUpload} />
@@ -181,7 +177,7 @@ export default function Items() {
                 </div>
               </div>
 
-              {/* Fields */}
+              {/* Name & Category */}
               <input
                 required
                 placeholder="Item Name"
@@ -202,6 +198,7 @@ export default function Items() {
                 ))}
               </select>
 
+              {/* Description */}
               <textarea
                 placeholder="Description"
                 value={formData.description}
@@ -209,7 +206,8 @@ export default function Items() {
                 className="w-full border px-3 py-2 rounded"
               />
 
-              <div className="grid grid-cols-3 gap-4">
+              {/* Prices & Stock */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <input
                   type="number"
                   placeholder="Sale Price"
@@ -219,20 +217,15 @@ export default function Items() {
                   }
                   className="border px-3 py-2 rounded"
                 />
-
                 <input
                   type="number"
                   placeholder="Rental / Day"
                   value={formData.price_rental_per_day}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      price_rental_per_day: Number(e.target.value),
-                    })
+                    setFormData({ ...formData, price_rental_per_day: Number(e.target.value) })
                   }
                   className="border px-3 py-2 rounded"
                 />
-
                 <input
                   type="number"
                   placeholder="Stock"
@@ -245,10 +238,10 @@ export default function Items() {
               </div>
 
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={resetForm} className="px-4 py-2 bg-gray-100 rounded">
+                <button type="button" onClick={resetForm} className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 transition">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded">
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition">
                   {editingId ? "Update" : "Create"}
                 </button>
               </div>
@@ -257,52 +250,47 @@ export default function Items() {
         </div>
       )}
 
-      {/* Inventory Table */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left">
-            <tr>
-              <th className="p-3">Item</th>
-              <th className="p-3">Category</th>
-              <th className="p-3">Sale</th>
-              <th className="p-3">Rental</th>
-              <th className="p-3">Stock</th>
-              <th className="p-3 text-right">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id} className="border-t hover:bg-gray-50">
-                <td className="p-3 flex items-center gap-3">
-                  {item.image && (
-                    <Image src={item.image} alt={item.name} width={40} height={40} />
-                  )}
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-xs text-gray-500">{item.description}</p>
-                  </div>
-                </td>
-                <td className="p-3">{getCategoryLabel(item.category)}</td>
-                <td className="p-3">₦{item.price_sale.toLocaleString()}</td>
-                <td className="p-3">₦{item.price_rental_per_day.toLocaleString()}</td>
-                <td className="p-3">{item.stock_quantity}</td>
-                <td className="p-3 text-right space-x-2">
-                  <button onClick={() => handleEdit(item)} className="text-blue-600">
-                    <Edit2 size={16} />
-                  </button>
-                  <button onClick={() => handleDelete(item)} className="text-red-600">
-                    <Trash2 size={16} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
+      {/* Inventory Table / Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.length === 0 && (
-          <div className="p-6 text-center text-gray-500">No inventory items</div>
+          <div className="col-span-full text-center text-gray-500 py-10">
+            No inventory items
+          </div>
         )}
+
+        {items.map((item) => (
+          <div key={item.id} className="bg-white shadow rounded-lg overflow-hidden flex flex-col">
+            <div className="relative h-40 w-full">
+              {item.image && (
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  fill
+                  className="object-cover"
+                />
+              )}
+            </div>
+            <div className="p-4 flex flex-col gap-2 flex-1">
+              <h4 className="font-semibold text-lg">{item.name}</h4>
+              <p className="text-sm text-gray-500">{item.description}</p>
+              <p className="text-sm font-medium">{getCategoryLabel(item.category)}</p>
+              <div className="flex justify-between mt-auto text-sm">
+                <span>₦{item.price_sale.toLocaleString()}</span>
+                <span>₦{item.price_rental_per_day.toLocaleString()}/day</span>
+                <span>Stock: {item.stock_quantity}</span>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-2">
+                <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800 transition">
+                  <Edit2 size={16} />
+                </button>
+                <button onClick={() => handleDelete(item)} className="text-red-600 hover:text-red-800 transition">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
