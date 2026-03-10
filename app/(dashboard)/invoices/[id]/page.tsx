@@ -2,13 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
-import { doc, getDoc, collection, getDocs, updateDoc } from "firebase/firestore"
-import { db } from "@/lib/firebase"
+import { supabase } from "@/lib/supabase"
 import InvoicePreview from "../../components/InvoicePreview"
 import { Printer } from "lucide-react"
-import AddPaymentModal from "../../components/AddPaymentModal"
-import PaymentsTable from "../../components/PaymentsTable";
-import { PaymentProgress } from "../../components/PaymentProgress";
 import { Payment } from "@/types/payment"
 
 /* ================= TYPES ================= */
@@ -24,15 +20,19 @@ interface InvoiceItem {
   image?: string
 }
 
+interface Customer {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+}
+
 interface Invoice {
+  id: string
   invoice_number: string
   invoice_date: string
   due_date: string
-  customer: {
-    name: string
-    email?: string
-    phone?: string
-  }
+  customer: Customer
   items: InvoiceItem[]
   subtotal: number
   tax: number
@@ -41,15 +41,47 @@ interface Invoice {
   status: InvoiceStatus
 }
 
+interface SupabaseInvoiceItemRow {
+  id: string
+  invoice_id: string
+  item_id: string
+  item_name: string
+  item_image?: string | null
+  quantity: number
+  unit_price: number
+  total: number
+}
+
+interface SupabaseCustomerRow {
+  id: string
+  name: string
+  email?: string | null
+  phone?: string | null
+}
+
+interface SupabaseInvoiceRow {
+  id: string
+  invoice_number: string
+  invoice_date: string
+  due_date: string
+  customer_id: string
+  notes?: string | null
+  status: InvoiceStatus
+  tax?: number | null
+  invoice_items?: SupabaseInvoiceItemRow[]
+  customers?: SupabaseCustomerRow
+}
+
 /* ================= COMPONENT ================= */
 
 export default function InvoicePage() {
-  const { id } = useParams()
+  const params = useParams()
+const id = params.id as string
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [updatingStatus, setUpdatingStatus] = useState(false)
-  const [payments, setPayments] = useState<Payment[]>([]);
-const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
 
   /* ================= FETCH INVOICE ================= */
   useEffect(() => {
@@ -58,53 +90,57 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
     const fetchInvoice = async () => {
       setLoading(true)
       try {
-        const docRef = doc(db, "invoices", id)
-        const docSnap = await getDoc(docRef)
-        if (!docSnap.exists()) return
+        // Fetch invoice
+        const { data: invoiceData, error: invoiceError } = await supabase
+          .from("invoices")
+          .select(`*, invoice_items (*), customers (*)`)
+          .eq("id", id)
+          .single()
 
-        const data = docSnap.data()
+        if (invoiceError || !invoiceData) {
+          console.error("Invoice fetch error:", invoiceError)
+          setInvoice(null)
+          return
+        }
 
-        const customerRef = doc(db, "customers", data.customer_id)
-        const customerSnap = await getDoc(customerRef)
-        const customerData = customerSnap.exists() ? customerSnap.data() : { name: "Unknown" }
-
-        const itemsSnap = await getDocs(collection(db, "invoice_items"))
-        const inventorySnap = await getDocs(collection(db, "inventory"))
-        const inventoryMap = new Map(inventorySnap.docs.map(d => [d.id, d.data().image as string]))
-
-        const items: InvoiceItem[] = itemsSnap.docs
-          .filter(d => d.data().invoice_id === id)
-          .map(d => {
-            const x = d.data()
-            return {
-              item_id: String(x.item_id),
-              item_name: String(x.item_name),
-              quantity: Number(x.quantity),
-              unit_price: Number(x.unit_price),
-              total: Number(x.total),
-              image: inventoryMap.get(x.item_id),
+        // Map customer
+        const customerData = invoiceData.customers
+          ? {
+              id: invoiceData.customers.id,
+              name: invoiceData.customers.name,
+              email: invoiceData.customers.email || "",
+              phone: invoiceData.customers.phone || "",
             }
-          })
+          : { id: "", name: "Unknown" }
+
+        // Map invoice items
+        const items: InvoiceItem[] = (invoiceData.invoice_items || []).map(
+  (i: SupabaseInvoiceItemRow) => ({
+    item_id: i.item_id,
+    item_name: i.item_name,
+    quantity: i.quantity,
+    unit_price: i.unit_price,
+    total: i.total,
+    image: i.item_image ?? undefined,
+  })
+)
 
         const subtotal = items.reduce((sum, i) => sum + i.total, 0)
-        const tax = 0
+        const tax = invoiceData.tax ?? 0
         const total = subtotal + tax
 
         setInvoice({
-          invoice_number: String(data.invoice_number),
-          invoice_date: String(data.invoice_date),
-          due_date: String(data.due_date),
-          customer: {
-            name: String(customerData.name),
-            email: String(customerData.email || ""),
-            phone: String(customerData.phone || ""),
-          },
+          id: invoiceData.id,
+          invoice_number: invoiceData.invoice_number,
+          invoice_date: invoiceData.invoice_date,
+          due_date: invoiceData.due_date,
+          customer: customerData,
           items,
           subtotal,
           tax,
           total,
-          notes: String(data.notes || ""),
-          status: (data.status as InvoiceStatus) || "draft",
+          notes: invoiceData.notes || "",
+          status: invoiceData.status as InvoiceStatus || "draft",
         })
       } finally {
         setLoading(false)
@@ -114,31 +150,27 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
     fetchInvoice()
   }, [id])
 
-  /* ================= PRINT (SAVE AS PDF) ================= */
+  /* ================= PRINT ================= */
   const handlePrint = () => {
     if (!invoice) return
-
     const originalTitle = document.title
     document.title = `${invoice.customer.name.replace(/\s+/g, "_")}-Invoice-${invoice.invoice_number}`
-
     window.print()
-
-    setTimeout(() => {
-      document.title = originalTitle
-    }, 1000)
+    setTimeout(() => { document.title = originalTitle }, 1000)
   }
 
   /* ================= UPDATE STATUS ================= */
   const updateStatus = async (status: InvoiceStatus) => {
-    if (!id || Array.isArray(id)) return
-    if (!invoice) return
+    if (!id || Array.isArray(id) || !invoice) return
 
     try {
       setUpdatingStatus(true)
-      const docRef = doc(db, "invoices", id)
-      await updateDoc(docRef, { status })
+      const { error } = await supabase
+        .from("invoices")
+        .update({ status })
+        .eq("id", id)
+      if (error) throw error
 
-      // Update UI instantly
       setInvoice(prev => prev ? { ...prev, status } : prev)
     } catch (err) {
       console.error("Status update failed", err)
@@ -169,7 +201,6 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
         {/* STATUS CONTROL */}
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">Status:</span>
-
           <select
             value={invoice.status}
             onChange={(e) => updateStatus(e.target.value as InvoiceStatus)}
@@ -182,7 +213,6 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
             <option value="overdue">Overdue</option>
             <option value="cancelled">Cancelled</option>
           </select>
-
           {updatingStatus && <span className="text-xs text-gray-500">Updating...</span>}
         </div>
       </div>
@@ -191,6 +221,7 @@ const [showPaymentModal, setShowPaymentModal] = useState(false);
       <div id="invoice-preview">
         <InvoicePreview invoice={invoice} />
       </div>
+
     </div>
   )
 }

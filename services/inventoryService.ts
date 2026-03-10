@@ -1,113 +1,138 @@
-// services/inventoryService.ts
-import { db } from "@/lib/firebase";
-import {
-  collection,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  orderBy,
-  limit,
-  getDocs,
-  startAfter,
-  where,
-  onSnapshot,
-  DocumentData,
-  QueryDocumentSnapshot,
-  Query,
-} from "firebase/firestore";
+// import { supabase } from "@/lib/supabase";
+// import { Item } from "@/types/item";
+
+// // Create
+// export async function createItem(item: Omit<Item, "id" | "created_at">) {
+//   const { error } = await supabase.from("items").insert([item]);
+//   if (error) throw error;
+// }
+
+// // Update
+// export async function updateItem(id: string, item: Partial<Item>) {
+//   const { error } = await supabase
+//     .from("items")
+//     .update(item)
+//     .eq("id", id);
+
+//   if (error) throw error;
+// }
+
+// // Delete
+// export async function deleteItem(id: string) {
+//   const { error } = await supabase
+//     .from("items")
+//     .delete()
+//     .eq("id", id);
+
+//   if (error) throw error;
+// }
+
+// // Listen / Fetch Items
+// export function listenToItems(
+//   setItems: React.Dispatch<React.SetStateAction<Item[]>>,
+//   search: string
+// ) {
+//   fetchItems(setItems, search);
+//   return () => {}; // cleanup placeholder
+// }
+
+// // Internal fetch function
+// async function fetchItems(
+//   setItems: React.Dispatch<React.SetStateAction<Item[]>>,
+//   search: string
+// ) {
+//   let query = supabase
+//     .from("items")
+//     .select("*")
+//     .order("created_at", { ascending: false });
+
+//   if (search) {
+//     query = query.ilike("name", `%${search}%`);
+//   }
+
+//   const { data, error } = await query;
+
+//   if (error) {
+//     console.error(error);
+//     return;
+//   }
+
+//   setItems(data as Item[]);
+// }
+
+import { supabase } from "@/lib/supabase";
 import { Item } from "@/types/item";
 
-const inventoryCollection = collection(db, "inventory");
+// CREATE
+export async function createItem(
+  item: Omit<Item, "id" | "created_at">
+) {
+  const { error } = await supabase
+    .from("items")
+    .insert([item]);
 
-/* ================= CREATE ITEM ================= */
-export async function createItem(data: Omit<Item, "id" | "createdAt">) {
-  return await addDoc(inventoryCollection, {
-    ...data,
-    createdAt: new Date(),
-    name_lower: data.name.toLowerCase(), // needed for search
-  });
+  if (error) throw error;
 }
 
-/* ================= UPDATE ITEM ================= */
-export async function updateItem(id: string, data: Partial<Item>) {
-  return await updateDoc(doc(db, "inventory", id), data);
+// UPDATE
+export async function updateItem(
+  id: string,
+  item: Partial<Omit<Item, "id" | "created_at">>
+) {
+  const { error } = await supabase
+    .from("items")
+    .update(item)
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
-/* ================= DELETE ITEM ================= */
+// DELETE
 export async function deleteItem(id: string) {
-  return await deleteDoc(doc(db, "inventory", id));
+  const { error } = await supabase
+    .from("items")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
 }
 
-/* ================= PAGINATION + SEARCH ================= */
-export async function getItemsPaginated(
-  pageSize: number,
-  lastDoc?: QueryDocumentSnapshot<DocumentData> | null,
-  search?: string
-) {
-  let q: Query<DocumentData>;
 
-  if (search && search.trim() !== "") {
-    const term = search.toLowerCase();
 
-    q = query(
-      inventoryCollection,
-      where("name_lower", ">=", term),
-      where("name_lower", "<=", term + "\uf8ff"),
-      orderBy("name_lower"),
-      limit(pageSize)
-    );
-  } else {
-    q = query(
-      inventoryCollection,
-      orderBy("createdAt", "desc"),
-      limit(pageSize)
-    );
+// FETCH ITEMS
+export async function fetchItems(search?: string) {
+  let query = supabase
+    .from("items")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (search) {
+    query = query.ilike("name", `%${search}%`);
   }
 
-  if (lastDoc) {
-    q = query(q, startAfter(lastDoc));
-  }
+  const { data, error } = await query;
 
-  const snapshot = await getDocs(q);
+  if (error) throw error;
 
-  const items: Item[] = snapshot.docs.map((d) => ({
-    id: d.id,
-    ...(d.data() as Omit<Item, "id">),
-  }));
-
-  return {
-    items,
-    lastDoc: snapshot.docs[snapshot.docs.length - 1] ?? null,
-  };
+  return data as Item[];
 }
 
-/* ================= REAL-TIME LISTENER ================= */
-export function listenToItems(
-  callback: (items: Item[]) => void,
-  search?: string
-) {
-  let q: Query<DocumentData>;
 
-  if (search && search.trim() !== "") {
-    const term = search.toLowerCase();
-    q = query(
-      inventoryCollection,
-      where("name_lower", ">=", term),
-      where("name_lower", "<=", term + "\uf8ff"),
-      orderBy("name_lower")
-    );
-  } else {
-    q = query(inventoryCollection, orderBy("createdAt", "desc"));
-  }
 
-  return onSnapshot(q, (snapshot) => {
-    const items: Item[] = snapshot.docs.map((d) => ({
-      id: d.id,
-      ...(d.data() as Omit<Item, "id">),
-    }));
+export async function fetchItemsWithPagination(
+  search: string,
+  page: number,
+  pageSize: number
+): Promise<Item[]> {
+  let query = supabase
+    .from("items")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .range(page * pageSize, (page + 1) * pageSize - 1);
 
-    callback(items);
-  });
+  if (search) query = query.ilike("name", `%${search}%`);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as Item[];
 }
