@@ -217,12 +217,22 @@ export default function Page() {
               />
             </div>
 
+
             {/* Error */}
             {error && (
               <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded">
                 {error}
               </p>
             )}
+
+            <div className="text-right">
+  <a
+    href="/forget-password"
+    className="text-sm text-blue-400 hover:underline"
+  >
+    Forgot password?
+  </a>
+</div>
 
             {/* Button */}
             <button
